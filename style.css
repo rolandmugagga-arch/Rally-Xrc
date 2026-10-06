@@ -34,3 +34,6 @@ label{display:block;margin:0 0 1rem;font-weight:600}input,select,textarea{displa
 footer{background:var(--peach);color:var(--ink);padding:2.5rem 1.2rem;text-align:center;letter-spacing:.06em}
 @media(max-width:760px){.split,.split2{grid-template-columns:1fr}.masonry{column-count:2}nav a{margin-left:.7rem}}
 footer .sm a{margin:0 .6rem;color:var(--ink)}
+.hero .hv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.hero.hasv .bg{animation:none}
+.sf{display:flex;gap:.4rem;margin-left:auto;margin-right:1rem}.sf input{width:150px;margin:0;padding:.35rem .9rem;border-radius:999px}.sf button{padding:.35rem 1rem}.bigsf{display:flex;gap:.6rem;margin:0 0 1.5rem;max-width:640px}.bigsf input{margin:0}
+@media(max-width:760px){.sf{order:3;width:100%;margin:0}.sf input{width:100%}}
