@@ -1,11 +1,18 @@
 <?php require 'inc.php';$u=me();if(!$u||$u['role']!='admin'){header('Location: auth.php?m=login');exit;}
 if(isset($_GET['backup'])){header('Content-Type: application/octet-stream');header('Content-Disposition: attachment; filename="rallyx-backup-'.date('Y-m-d').'.sqlite"');readfile($dbp);exit;}
 if(isset($_GET['members'])){header('Content-Type: text/csv');header('Content-Disposition: attachment; filename="rallyx-members-'.date('Y-m-d').'.csv"');$o=fopen('php://output','w');fputcsv($o,['Name','Email','Role','League','Car','Phone','Joined']);foreach($db->query("SELECT name,email,kind,age_group,car,phone,created FROM users WHERE role!='admin' ORDER BY id")->fetchAll(PDO::FETCH_NUM) as $r)fputcsv($o,array_map(fn($c)=>preg_match('/^[=+\-@]/',(string)$c)?"'".$c:$c,$r));exit;}
-$ok=['jpg'=>'image','jpeg'=>'image','png'=>'image','webp'=>'image','mp4'=>'video','mov'=>'video','webm'=>'video'];$msg='';$K=['Driver','Co-driver','Team owner','Mechanic','Marshal','Fan'];
+$ok=['jpg'=>'image','jpeg'=>'image','png'=>'image','webp'=>'image','mp4'=>'video','mov'=>'video','m4v'=>'video','webm'=>'video'];$msg='';$K=['Driver','Co-driver','Team owner','Mechanic','Marshal','Fan'];
+$ajax=($_SERVER['HTTP_X_REQUESTED_WITH']??'')=='fetch';
+function jout($ok,$m){header('Content-Type: application/json');echo json_encode(['ok'=>$ok,'msg'=>$m]);exit;}
+if($_SERVER['REQUEST_METHOD']=='POST'&&$ajax&&empty($_POST)&&empty($_FILES))jout(false,'This file is bigger than the server limit.');
 if($_SERVER['REQUEST_METHOD']=='POST'){chk();$a=$_POST['a']??'';
  if($a=='post'&&trim($_POST['title'])){$db->prepare('INSERT INTO posts(title,body) VALUES(?,?)')->execute([trim($_POST['title']),trim($_POST['body'])]);$msg='News published.';}
- if($a=='media'&&isset($_FILES['f'])&&$_FILES['f']['error']===0){$e=strtolower(pathinfo($_FILES['f']['name'],PATHINFO_EXTENSION));
-  if(isset($ok[$e])){$p='uploads/files/'.bin2hex(random_bytes(8)).".$e";move_uploaded_file($_FILES['f']['tmp_name'],__DIR__."/$p");$db->prepare('INSERT INTO media(kind,path,caption) VALUES(?,?,?)')->execute([$ok[$e],$p,trim($_POST['cap'])]);$msg='Uploaded.';}else $msg='Use jpg, png, webp, mp4 or webm.';}
+ if($a=='media'){$f=$_FILES['f']??null;$er=$f['error']??4;$e=strtolower(pathinfo($f['name']??'',PATHINFO_EXTENSION));
+  if($er!==0)$msg=[1=>'File is bigger than the server limit.',2=>'File is bigger than the server limit.',3=>'Upload was interrupted. Try again.',4=>'No file was chosen.'][$er]??'Upload failed.';
+  elseif(!isset($ok[$e]))$msg='Cannot use .'.$e.' files. Use mp4, mov, m4v, webm, jpg, png or webp.';
+  elseif(!is_dir(__DIR__.'/uploads/files')||!move_uploaded_file($f['tmp_name'],__DIR__.'/'.($p='uploads/files/'.bin2hex(random_bytes(8)).".$e")))$msg='The server could not save the file (storage may be full).';
+  else{$db->prepare('INSERT INTO media(kind,path,caption) VALUES(?,?,?)')->execute([$ok[$e],$p,trim($_POST['cap']??'')]);$msg='Uploaded.';$good=1;}
+  if($ajax)jout(!empty($good),$msg);}
  if($a=='banner'){$db->prepare("REPLACE INTO settings(k,v) VALUES('banner',?)")->execute([trim($_POST['b'])]);$msg='Banner saved.';}
  if($a=='event'&&trim($_POST['title'])){$db->prepare('INSERT INTO events(title,day,place) VALUES(?,?,?)')->execute([trim($_POST['title']),$_POST['day'],trim($_POST['place'])]);$msg='Event added.';}
  if($a=='delevent')$db->prepare('DELETE FROM events WHERE id=?')->execute([$_POST['id']]);
@@ -19,12 +26,20 @@ if($_SERVER['REQUEST_METHOD']=='POST'){chk();$a=$_POST['a']??'';
 head('Admin | Rally XRC');$T=tok();
 function del($a,$id,$T){return "<form method=post class=inl onsubmit=\"return confirm('Delete this?')\"><input type=hidden name=t value=$T><input type=hidden name=a value=$a><input type=hidden name=id value=$id><button class=x>Delete</button></form>";}?>
 <main class="wrap"><h2>Admin panel</h2><?php if($msg)echo '<p class="err">'.h($msg).'</p>';?>
-<div id="dz" tabindex="0">Drop videos or photos here, or click to choose</div><input type="file" id="fi" multiple accept="image/*,video/*" hidden><p id="st"></p>
-<script>const dz=document.getElementById('dz'),fi=document.getElementById('fi'),st=document.getElementById('st');
-async function up(fs){let ok=0;for(const f of fs){st.textContent='Uploading '+f.name+'...';const d=new FormData();d.append('t','<?=$T?>');d.append('a','media');d.append('cap',f.name.replace(/\.[^.]+$/,''));d.append('f',f);
-try{const r=await fetch('admin.php',{method:'POST',body:d}),x=await r.text();if(x.includes('Uploaded.'))ok++;else{st.textContent='Could not upload '+f.name+'. Use mp4, mov, webm, jpg or png, and check the server upload limit.';return}}catch(e){st.textContent='Upload failed for '+f.name;return}}
-if(ok)location.reload()}
-dz.ondragover=e=>{e.preventDefault();dz.classList.add('on')};dz.ondragleave=()=>dz.classList.remove('on');dz.ondrop=e=>{e.preventDefault();up(e.dataTransfer.files)};dz.onclick=()=>fi.click();fi.onchange=()=>up(fi.files);</script>
+<div id="dz" tabindex="0">Drop videos or photos here, or click to choose (mp4, mov, webm, jpg, png, up to 500 MB each)</div><input type="file" id="fi" multiple accept="image/*,video/*" hidden><p id="st"></p>
+<script>const dz=document.getElementById('dz'),fi=document.getElementById('fi'),st=document.getElementById('st'),OK=/\.(mp4|mov|m4v|webm|jpe?g|png|webp)$/i,MAX=500*1024*1024;
+function row(t){const p=document.createElement('p');p.textContent=t;st.appendChild(p);return p}
+function bad(r,t){r.textContent=t;r.style.color='#c4421a'}
+function send(f,r){return new Promise(res=>{const d=new FormData();d.append('t','<?=$T?>');d.append('a','media');d.append('cap',f.name.replace(/\.[^.]+$/,''));d.append('f',f);const x=new XMLHttpRequest();x.open('POST','admin.php');x.setRequestHeader('X-Requested-With','fetch');
+x.upload.onprogress=e=>{if(e.lengthComputable)r.textContent=f.name+': uploading '+Math.round(e.loaded/e.total*100)+'%'};
+x.onload=()=>{let j;try{j=JSON.parse(x.responseText)}catch(e){j={ok:false,msg:'The server did not accept it. Reload the page and log in again, or the file may be too big.'}}if(j.ok)r.textContent=f.name+': done';else bad(r,f.name+': FAILED. '+j.msg);res(j.ok)};
+x.onerror=()=>{bad(r,f.name+': FAILED. Network problem, try again.');res(false)};x.send(d)})}
+async function up(fs){st.textContent='';let ok=0,ng=0;for(const f of fs){const r=row(f.name+': waiting');
+if(!OK.test(f.name)){bad(r,f.name+': FAILED. Use mp4, mov, m4v, webm, jpg, png or webp.');ng++;continue}
+if(f.size>MAX){bad(r,f.name+': FAILED. Over 500 MB. Shrink it first.');ng++;continue}
+(await send(f,r))?ok++:ng++}
+row(ok+' uploaded, '+ng+' failed.');if(ok&&!ng)setTimeout(()=>location.reload(),1200);else if(ok)row('Reload the page to see the files that uploaded.')}
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('on')};dz.ondragleave=()=>dz.classList.remove('on');dz.ondrop=e=>{e.preventDefault();dz.classList.remove('on');up(e.dataTransfer.files)};dz.onclick=()=>fi.click();fi.onchange=()=>up(fi.files);</script>
 <div class="grid"><?php $c=fn($q)=>$db->query($q)->fetchColumn();foreach([['Members',"SELECT COUNT(*) FROM users WHERE role!='admin'"],['Youth',"SELECT COUNT(*) FROM users WHERE age_group='Youth'"],['Adult',"SELECT COUNT(*) FROM users WHERE age_group='Adult'"],['Photos',"SELECT COUNT(*) FROM media WHERE kind='image'"],['Videos',"SELECT COUNT(*) FROM media WHERE kind='video'"],['News posts','SELECT COUNT(*) FROM posts']] as $s)echo '<div class="mem"><b>'.$c($s[1]).'</b>'.$s[0].'</div>';?></div><br>
 <div class="split2"><form method="post"><h3>Post news</h3><input type="hidden" name="t" value="<?=$T?>"><input type="hidden" name="a" value="post"><label>Title<input name="title" required></label><label>Message<textarea name="body" rows="5"></textarea></label><button class="btn">Publish news</button></form>
 <form method="post" enctype="multipart/form-data"><h3>Add photo or video</h3><input type="hidden" name="t" value="<?=$T?>"><input type="hidden" name="a" value="media"><label>File<input type="file" name="f" accept="image/*,video/mp4,video/webm" required></label><label>Caption<input name="cap"></label><button class="btn">Upload</button></form></div>
