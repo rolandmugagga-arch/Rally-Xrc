@@ -1,0 +1,17 @@
+<?php require 'inc.php';head('RALLY X | RC rally racing in Uganda');
+$hero=basename(glob(__DIR__.'/uploads/seed/s12.*')[0]);
+$posts=$db->query('SELECT * FROM posts ORDER BY id DESC LIMIT 6')->fetchAll();
+$mem=$db->query("SELECT name,kind,age_group,car FROM users WHERE role!='admin' ORDER BY id DESC")->fetchAll();
+$img=$db->query("SELECT * FROM media WHERE kind='image' ORDER BY id")->fetchAll();
+$vid=$db->query("SELECT * FROM media WHERE kind='video' ORDER BY id DESC")->fetchAll();?>
+<header class="hero"><div class="bg" style="background-image:url(uploads/seed/<?=h($hero)?>)"></div><div class="wrap"><h1>Every driver.<br>One stage.<br>RALLY X.</h1><p>The official RC rally game of Uganda. Register your car, find your rivals and race on the dirt, from first-time youths to veteran drivers.</p><a class="btn" href="auth.php?m=register">Register now</a> <a class="btn alt" href="#gallery">See the action</a></div>
+<svg viewBox="0 0 600 60" preserveAspectRatio="none"><path d="M0 40 C100 5 160 60 260 30 S420 5 600 35" /></svg></header>
+<section id="news" class="wrap"><h2>Latest news</h2><?php foreach($posts as $p):?><details open><summary><?=h($p['title'])?> <small><?=h(substr($p['created'],0,10))?></small></summary><p><?=nl2br(h($p['body']))?></p></details><?php endforeach;?></section>
+<section id="leagues" class="split"><div class="youth"><h2>Youth league</h2><p>Under 18? Bring a car, learn stage craft and race alongside friends. Mechanics and marshals are welcome too.</p><a class="btn" href="auth.php?m=register&age=Youth">Join as youth</a></div><div class="adult"><h2>Adult league</h2><p>Teams, sponsors and seasoned drivers compete for the top step. Link your team and show your livery.</p><a class="btn" href="auth.php?m=register&age=Adult">Join as adult</a></div></section>
+<section id="events" class="wrap"><h2>Events</h2><div class="grid"><?php $n=0;foreach($db->query('SELECT * FROM events ORDER BY day') as $e){$n++;echo '<div class="mem"><h3>'.h($e['title']).'</h3><p>'.h($e['day']).($e['place']?', '.h($e['place']):'').'</p></div>';}if(!$n)echo '<p>No events yet. Check back soon.</p>';?></div></section>
+<section id="drivers" class="wrap"><h2>The grid</h2><?php if(!$mem)echo '<p>No members yet. Be the first on the grid.</p>';?><div class="grid"><?php foreach($mem as $m):?><div class="mem"><h3><?=h($m['name'])?></h3><p><?=h($m['kind'])?>, <?=h($m['age_group'])?><?=$m['car']?'. Car: '.h($m['car']):''?></p></div><?php endforeach;?></div></section>
+<section id="gallery" class="wrap"><h2>Gallery</h2><div class="masonry"><?php foreach($img as $i):?><figure><img loading="lazy" src="<?=h($i['path'])?>" alt="<?=h($i['caption'])?>"><figcaption><?=h($i['caption'])?></figcaption></figure><?php endforeach;?></div></section>
+<section id="videos" class="wrap"><h2>Videos</h2><?php if(!$vid)echo '<p>Race videos will appear here once the admin uploads them.</p>';foreach($vid as $v):?><figure><video controls preload="metadata" src="<?=h($v['path'])?>"></video><figcaption><?=h($v['caption'])?></figcaption></figure><?php endforeach;?></section>
+<div id="lb" hidden><img alt=""></div>
+<script>const lb=document.getElementById('lb');document.querySelectorAll('.masonry img').forEach(i=>i.onclick=()=>{lb.firstChild.src=i.src;lb.hidden=false});lb.onclick=()=>lb.hidden=true;addEventListener('keydown',e=>e.key=='Escape'&&(lb.hidden=true))</script>
+<?php foot();

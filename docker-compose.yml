@@ -1,0 +1,11 @@
+services:
+  rallyx:
+    build: .
+    ports: ["8080:80"]
+    environment:
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-this-password}
+    volumes:
+      - rallyx-persist:/persist
+volumes:
+  rallyx-persist:
