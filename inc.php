@@ -9,7 +9,11 @@ $db->exec("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name,email UN
 CREATE TABLE IF NOT EXISTS posts(id INTEGER PRIMARY KEY,title,body,created DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS settings(k PRIMARY KEY,v);
 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY,title,day,place);
+CREATE TABLE IF NOT EXISTS accounts(id INTEGER PRIMARY KEY,label,number,network);
+CREATE TABLE IF NOT EXISTS deposits(id INTEGER PRIMARY KEY,user_id INTEGER,amount INTEGER,month,network,phone,txid,note,status DEFAULT 'pending',seen INTEGER DEFAULT 0,created DEFAULT CURRENT_TIMESTAMP,UNIQUE(network,txid));
 CREATE TABLE IF NOT EXISTS media(id INTEGER PRIMARY KEY,kind,path,caption,created DEFAULT CURRENT_TIMESTAMP);");
+if(!in_array('network',array_column($db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_ASSOC),'name')))$db->exec('ALTER TABLE users ADD COLUMN network');
+if(!$db->query('SELECT 1 FROM accounts')->fetch())$db->exec("INSERT INTO accounts(label,number,network) VALUES('Club mobile money','0708719834','MTN and Airtel')");
 $cap=['Wheel up on the pit stand','Controllers out, cars on the slope','Josh Rally Team meets RallyXRC','Ford Fiesta in full livery','KCB Bank Subaru','The grid before the start','Two Subarus, rear view','Mechanic plugging in the battery','Citroen C3 WRC beside a Land Cruiser','Racing on the dirt stage','Sliding through the corner','Dust on the open stage','Fans gather at the chalk line','Stage run','Driver and car','Side-on action','Volkswagen Polo WRC','Black GR car throwing dirt','Rear view of a slide'];
 if(!$db->query("SELECT 1 FROM users WHERE role='admin'")->fetch()){
  $db->prepare("INSERT INTO users(name,email,pass,role,kind) VALUES('Admin',?,?,'admin','Admin')")->execute([getenv('ADMIN_EMAIL')?:'rolandmugagga@gmail.com',password_hash(getenv('ADMIN_PASSWORD')?:'Roland12',PASSWORD_DEFAULT)]);
@@ -18,6 +22,16 @@ if(!$db->query("SELECT 1 FROM users WHERE role='admin'")->fetch()){
 }
 function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}
 function setting($k,$d=''){global $db;$s=$db->prepare('SELECT v FROM settings WHERE k=?');$s->execute([$k]);$v=$s->fetchColumn();return($v!==false&&$v!=='')?$v:$d;}
+function normphone($p){$p=preg_replace('/[\s\-().]/','',(string)$p);if(preg_match('/^\+?256(\d{9})$/',$p,$m))$p='0'.$m[1];return preg_match('/^0\d{9}$/',$p)?$p:false;}
+function ugx($n){return 'UGX '.number_format((int)$n);}
+function notify($t){$tk=getenv('TELEGRAM_BOT_TOKEN');$ch=getenv('TELEGRAM_CHAT_ID');if(!$tk||!$ch)return;@file_get_contents("https://api.telegram.org/bot$tk/sendMessage",false,stream_context_create(['http'=>['method'=>'POST','header'=>"Content-Type: application/x-www-form-urlencoded\r\n",'content'=>http_build_query(['chat_id'=>$ch,'text'=>$t]),'timeout'=>3]]));}
+function flw($method,$path,$body=null){$k=getenv('FLW_SECRET_KEY');if(!$k)return null;$c=curl_init('https://api.flutterwave.com/v3'.$path);curl_setopt_array($c,[CURLOPT_RETURNTRANSFER=>1,CURLOPT_TIMEOUT=>20,CURLOPT_CUSTOMREQUEST=>$method,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$k,'Content-Type: application/json']]);if($body!==null)curl_setopt($c,CURLOPT_POSTFIELDS,json_encode($body));$r=curl_exec($c);curl_close($c);return $r?json_decode($r,true):null;}
+function flw_confirm($id){global $db;$r=flw('GET','/transactions/'.rawurlencode($id).'/verify');$d=$r['data']??null;
+ if(!$d||($d['status']??'')!=='successful'||($d['currency']??'')!=='UGX')return false;
+ $s=$db->prepare('SELECT d.*,u.name AS uname FROM deposits d LEFT JOIN users u ON u.id=d.user_id WHERE d.txid=?');$s->execute([$d['tx_ref']??'']);$p=$s->fetch(PDO::FETCH_ASSOC);
+ if(!$p||(float)$d['amount']<(float)$p['amount'])return false;
+ if($p['status']!='confirmed'){$db->prepare("UPDATE deposits SET status='confirmed',seen=0,note=? WHERE id=?")->execute(['Flutterwave #'.$d['id'],$p['id']]);notify('Payment received: '.ugx($p['amount']).' from '.$p['uname'].' for '.$p['month'].'.');}
+ return true;}
 function me(){global $db;if(empty($_SESSION['uid']))return null;$s=$db->prepare('SELECT * FROM users WHERE id=?');$s->execute([$_SESSION['uid']]);return $s->fetch(PDO::FETCH_ASSOC);}
 function tok(){return $_SESSION['t']??=bin2hex(random_bytes(16));}
 function chk(){if(!hash_equals(tok(),$_POST['t']??''))die('Session expired. Go back and try again.');}
@@ -29,5 +43,5 @@ function head($t='Rally XRC',$d=''){$u=me();$d=$d?:"Rally XRC is the official RC
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Rally XRC","alternateName":["Rally XRC Uganda","RallyXRC","Rally XRCRC"],"url":<?=json_encode($base.'/')?>}</script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body>
 <?php $b=$GLOBALS['db']->query("SELECT v FROM settings WHERE k='banner'")->fetchColumn();if($b)echo '<div class="banner">'.h($b).'</div>';?><nav><a class="logo" href="index.php">RALLY <b>XRC</b></a><form class="sf" action="search.php" method="get" role="search"><input name="q" placeholder="Search" aria-label="Search the site" maxlength="60"><button>Go</button></form><div><a href="index.php#news">News</a><a href="index.php#leagues">Leagues</a><a href="index.php#drivers">Drivers</a><a href="index.php#gallery">Gallery</a><a href="index.php#events">Events</a><a href="index.php#videos">Videos</a><a href="admin.php">Admin</a>
-<?php if($u){echo '<a href="auth.php?m=out">Log out ('.h(explode(' ',$u['name'])[0]).')</a>';}else echo '<a href="auth.php?m=login">Log in</a><a class="btn" href="auth.php?m=register">Join</a>';?></div></nav><?php }
+<?php if($u){echo ($u['role']=='admin'?'<a href="payments.php">Payments'.(($n=(int)$GLOBALS['db']->query("SELECT COUNT(*) FROM deposits WHERE seen=0")->fetchColumn())?' <b class="bd">'.$n.'</b>':'').'</a>':'<a href="pay.php">Pay fees</a>').'<a href="auth.php?m=out">Log out ('.h(explode(' ',$u['name'])[0]).')</a>';}else echo '<a href="auth.php?m=login">Log in</a><a class="btn" href="auth.php?m=register">Join</a>';?></div></nav><?php }
 function foot(){echo '<footer><p>Rally XRC, the official RC rally game of Uganda. Drivers, teams and fans, one grid.</p><p class="sm"><a href="index.php">Home</a><a href="index.php#news">News</a><a href="index.php#events">Events</a><a href="index.php#leagues">Leagues</a><a href="index.php#drivers">The grid</a><a href="index.php#gallery">Gallery</a><a href="index.php#videos">Videos</a><a href="auth.php?m=register">Join</a><a href="auth.php?m=login">Log in</a><a href="sitemap.xml">Sitemap</a></p></footer></body></html>';}

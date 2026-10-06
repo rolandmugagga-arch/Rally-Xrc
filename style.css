@@ -37,3 +37,4 @@ footer .sm a{margin:0 .6rem;color:var(--ink)}
 .hero .hv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.hero.hasv .bg{animation:none}
 .sf{display:flex;gap:.4rem;margin-left:auto;margin-right:1rem}.sf input{width:150px;margin:0;padding:.35rem .9rem;border-radius:999px}.sf button{padding:.35rem 1rem}.bigsf{display:flex;gap:.6rem;margin:0 0 1.5rem;max-width:640px}.bigsf input{margin:0}
 @media(max-width:760px){.sf{order:3;width:100%;margin:0}.sf input{width:100%}}
+.bd{background:var(--coral);color:#fff;border-radius:999px;padding:0 .5rem;font-size:.8rem}
