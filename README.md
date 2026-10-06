@@ -1,4 +1,4 @@
-# RALLY X
+# Rally XRC
 
 The official RC rally game website for Uganda. It links drivers, co-drivers, teams, mechanics, marshals and fans, in both youth and adult leagues.
 

@@ -1,10 +1,10 @@
-<?php require 'inc.php';head('RALLY X | RC rally racing in Uganda');
-$hero=basename(glob(__DIR__.'/uploads/seed/s12.*')[0]);
+<?php require 'inc.php';head('Rally XRC Uganda | Official RC rally racing');
+$hero=basename((glob(__DIR__.'/uploads/seed/s12.*')?:[''])[0]);
 $posts=$db->query('SELECT * FROM posts ORDER BY id DESC LIMIT 6')->fetchAll();
 $mem=$db->query("SELECT name,kind,age_group,car FROM users WHERE role!='admin' ORDER BY id DESC")->fetchAll();
 $img=$db->query("SELECT * FROM media WHERE kind='image' ORDER BY id")->fetchAll();
 $vid=$db->query("SELECT * FROM media WHERE kind='video' ORDER BY id DESC")->fetchAll();?>
-<header class="hero"><div class="bg" style="background-image:url(uploads/seed/<?=h($hero)?>)"></div><div class="wrap"><h1>Every driver.<br>One stage.<br>RALLY X.</h1><p>The official RC rally game of Uganda. Register your car, find your rivals and race on the dirt, from first-time youths to veteran drivers.</p><a class="btn" href="auth.php?m=register">Register now</a> <a class="btn alt" href="#gallery">See the action</a></div>
+<header class="hero"><div class="bg" style="background-image:url(uploads/seed/<?=h($hero)?>)"></div><div class="wrap"><h1>Every driver.<br>One stage.<br>Rally XRC.</h1><p>The official RC rally game of Uganda. Register your car, find your rivals and race on the dirt, from first-time youths to veteran drivers.</p><a class="btn" href="auth.php?m=register">Register now</a> <a class="btn alt" href="#gallery">See the action</a></div>
 <svg viewBox="0 0 600 60" preserveAspectRatio="none"><path d="M0 40 C100 5 160 60 260 30 S420 5 600 35" /></svg></header>
 <section id="news" class="wrap"><h2>Latest news</h2><?php foreach($posts as $p):?><details open><summary><?=h($p['title'])?> <small><?=h(substr($p['created'],0,10))?></small></summary><p><?=nl2br(h($p['body']))?></p></details><?php endforeach;?></section>
 <section id="leagues" class="split"><div class="youth"><h2>Youth league</h2><p>Under 18? Bring a car, learn stage craft and race alongside friends. Mechanics and marshals are welcome too.</p><a class="btn" href="auth.php?m=register&age=Youth">Join as youth</a></div><div class="adult"><h2>Adult league</h2><p>Teams, sponsors and seasoned drivers compete for the top step. Link your team and show your livery.</p><a class="btn" href="auth.php?m=register&age=Adult">Join as adult</a></div></section>
