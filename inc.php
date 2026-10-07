@@ -1,5 +1,7 @@
 <?php
 ini_set('display_errors','0');error_reporting(E_ALL);
+$sp=getenv('DB_PATH')?dirname(getenv('DB_PATH')).'/sessions':'';if($sp){@mkdir($sp,0775,true);if(is_dir($sp)&&is_writable($sp))session_save_path($sp);}
+ini_set('session.gc_maxlifetime','2592000');
 session_set_cookie_params(['lifetime'=>2592000,'httponly'=>true,'samesite'=>'Lax']);
 session_start();
 $dbp=getenv('DB_PATH')?:__DIR__.'/data/rallyx.sqlite';@mkdir(dirname($dbp),0775,true);@mkdir(__DIR__.'/uploads/files',0775,true);
@@ -14,34 +16,63 @@ CREATE TABLE IF NOT EXISTS deposits(id INTEGER PRIMARY KEY,user_id INTEGER,amoun
 CREATE TABLE IF NOT EXISTS media(id INTEGER PRIMARY KEY,kind,path,caption,created DEFAULT CURRENT_TIMESTAMP);");
 if(!in_array('network',array_column($db->query('PRAGMA table_info(users)')->fetchAll(PDO::FETCH_ASSOC),'name')))$db->exec('ALTER TABLE users ADD COLUMN network');
 if(!$db->query('SELECT 1 FROM accounts')->fetch())$db->exec("INSERT INTO accounts(label,number,network) VALUES('Club mobile money','0708719834','MTN and Airtel')");
+if($hv=(int)$db->query("SELECT v FROM settings WHERE k='hero_video'")->fetchColumn()){$db->exec("INSERT OR IGNORE INTO settings(k,v) VALUES('hero_media',$hv)");$db->exec("DELETE FROM settings WHERE k='hero_video'");}
+foreach([['users','photo'],['media','sort']] as [$t,$c])if(!in_array($c,array_column($db->query("PRAGMA table_info($t)")->fetchAll(PDO::FETCH_ASSOC),'name')))$db->exec("ALTER TABLE $t ADD COLUMN $c");
+$db->exec("UPDATE media SET sort=id WHERE sort IS NULL");
+$db->exec("UPDATE users SET age_group='Junior' WHERE age_group='".'Y'."outh'");$db->exec("UPDATE users SET age_group='Senior' WHERE age_group='".'A'."dult'");
+$db->exec("CREATE TABLE IF NOT EXISTS push_subs(id INTEGER PRIMARY KEY,user_id INTEGER,endpoint TEXT UNIQUE,p256dh,auth,created DEFAULT CURRENT_TIMESTAMP)");
 $cap=['Wheel up on the pit stand','Controllers out, cars on the slope','Josh Rally Team meets RallyXRC','Ford Fiesta in full livery','KCB Bank Subaru','The grid before the start','Two Subarus, rear view','Mechanic plugging in the battery','Citroen C3 WRC beside a Land Cruiser','Racing on the dirt stage','Sliding through the corner','Dust on the open stage','Fans gather at the chalk line','Stage run','Driver and car','Side-on action','Volkswagen Polo WRC','Black GR car throwing dirt','Rear view of a slide'];
 if(!$db->query("SELECT 1 FROM users WHERE role='admin'")->fetch()){
  $db->prepare("INSERT INTO users(name,email,pass,role,kind) VALUES('Admin',?,?,'admin','Admin')")->execute([getenv('ADMIN_EMAIL')?:'rolandmugagga@gmail.com',password_hash(getenv('ADMIN_PASSWORD')?:'Roland12',PASSWORD_DEFAULT)]);
- foreach(glob(__DIR__.'/uploads/seed/*') as $i=>$f)$db->prepare("INSERT INTO media(kind,path,caption) VALUES('image',?,?)")->execute(['uploads/seed/'.basename($f),$cap[$i]??'']);
- $db->prepare("INSERT INTO posts(title,body) VALUES(?,?)")->execute(['Welcome to Rally XRC','Rally XRC is the home of RC rally racing in Uganda. Drivers, co-drivers, teams, mechanics and fans can now register in one place. Youth and adult leagues are both open.']);
+ foreach(glob(__DIR__.'/uploads/seed/*.{jpg,jpeg,png,webp}',GLOB_BRACE) as $i=>$f)$db->prepare("INSERT INTO media(kind,path,caption,sort) VALUES('image',?,?,(SELECT COALESCE(MAX(sort),0)+1 FROM media))")->execute(['uploads/seed/'.basename($f),$cap[$i]??'']);
+ $db->prepare("INSERT INTO posts(title,body) VALUES(?,?)")->execute(['Welcome to Rally XRC','Rally XRC is the home of RC rally racing in Uganda. Drivers, co-drivers, teams, mechanics and fans can now register in one place. Junior and senior leagues are both open.']);
 }
 function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}
 function setting($k,$d=''){global $db;$s=$db->prepare('SELECT v FROM settings WHERE k=?');$s->execute([$k]);$v=$s->fetchColumn();return($v!==false&&$v!=='')?$v:$d;}
 function normphone($p){$p=preg_replace('/[\s\-().]/','',(string)$p);if(preg_match('/^\+?256(\d{9})$/',$p,$m))$p='0'.$m[1];return preg_match('/^0\d{9}$/',$p)?$p:false;}
 function ugx($n){return 'UGX '.number_format((int)$n);}
 function notify($t){$tk=getenv('TELEGRAM_BOT_TOKEN');$ch=getenv('TELEGRAM_CHAT_ID');if(!$tk||!$ch)return;@file_get_contents("https://api.telegram.org/bot$tk/sendMessage",false,stream_context_create(['http'=>['method'=>'POST','header'=>"Content-Type: application/x-www-form-urlencoded\r\n",'content'=>http_build_query(['chat_id'=>$ch,'text'=>$t]),'timeout'=>3]]));}
-function flw($method,$path,$body=null){$k=getenv('FLW_SECRET_KEY');if(!$k)return null;$c=curl_init('https://api.flutterwave.com/v3'.$path);curl_setopt_array($c,[CURLOPT_RETURNTRANSFER=>1,CURLOPT_TIMEOUT=>20,CURLOPT_CUSTOMREQUEST=>$method,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$k,'Content-Type: application/json']]);if($body!==null)curl_setopt($c,CURLOPT_POSTFIELDS,json_encode($body));$r=curl_exec($c);curl_close($c);return $r?json_decode($r,true):null;}
+function flw($method,$path,$body=null){$k=getenv('FLW_SECRET_KEY');if(!$k)return null;$c=curl_init('https://api.flutterwave.com/v3'.$path);curl_setopt_array($c,[CURLOPT_RETURNTRANSFER=>1,CURLOPT_TIMEOUT=>20,CURLOPT_CUSTOMREQUEST=>$method,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$k,'Content-Type: application/json']]);if($body!==null)curl_setopt($c,CURLOPT_POSTFIELDS,json_encode($body));$r=curl_exec($c);return $r?json_decode($r,true):null;}
 function flw_confirm($id){global $db;$r=flw('GET','/transactions/'.rawurlencode($id).'/verify');$d=$r['data']??null;
  if(!$d||($d['status']??'')!=='successful'||($d['currency']??'')!=='UGX')return false;
  $s=$db->prepare('SELECT d.*,u.name AS uname FROM deposits d LEFT JOIN users u ON u.id=d.user_id WHERE d.txid=?');$s->execute([$d['tx_ref']??'']);$p=$s->fetch(PDO::FETCH_ASSOC);
  if(!$p||(float)$d['amount']<(float)$p['amount'])return false;
  if($p['status']!='confirmed'){$db->prepare("UPDATE deposits SET status='confirmed',seen=0,note=? WHERE id=?")->execute(['Flutterwave #'.$d['id'],$p['id']]);notify('Payment received: '.ugx($p['amount']).' from '.$p['uname'].' for '.$p['month'].'.');}
  return true;}
+function fcsv($o,$r){fputcsv($o,$r,',','"','');}
+function mv($p){return preg_match('#^uploads/files/([a-f0-9]{16}\.(?:mp4|mov|m4v|webm))$#',$p,$m)?'video.php?f='.$m[1]:$p;}
+function viewer(){return <<<'VW'
+<div id="vw" hidden role="dialog" aria-label="Photo and video viewer"><button type="button" class="vx" aria-label="Close">&times;</button><button type="button" class="vp" aria-label="Previous">&#8249;</button><button type="button" class="vn" aria-label="Next">&#8250;</button><div class="vs"></div><p class="vc"></p></div>
+<script>(function(){const vw=document.getElementById('vw');if(!vw)return;let L=[],i=0;
+const items=()=>[...document.querySelectorAll('.masonry figure, #videos figure')].filter(f=>f.querySelector('img,video'));
+function show(){const f=L[i],s=vw.querySelector('.vs'),v=f.dataset.src,im=f.querySelector('img'),cap=f.querySelector('figcaption');s.innerHTML='';let el;
+if(v){el=document.createElement('video');el.src=v;el.controls=true;el.autoplay=true;el.setAttribute('playsinline','')}else{el=document.createElement('img');el.src=im.currentSrc||im.src;el.alt=im.alt||''}
+s.appendChild(el);vw.querySelector('.vc').textContent=(cap?cap.textContent:'')+(L.length>1?'  ('+(i+1)+' of '+L.length+')':'')}
+function open(k){L=items();i=k;vw.hidden=false;document.body.style.overflow='hidden';show()}
+function close(){vw.hidden=true;vw.querySelector('.vs').innerHTML='';document.body.style.overflow=''}
+function go(d){i=(i+d+L.length)%L.length;show()}
+document.addEventListener('click',e=>{const f=e.target.closest('.masonry figure, #videos figure');if(f&&!e.target.closest('a[href]')){const k=items().indexOf(f);if(k>-1){e.preventDefault();open(k)}}});
+vw.querySelector('.vx').onclick=close;vw.querySelector('.vp').onclick=()=>go(-1);vw.querySelector('.vn').onclick=()=>go(1);
+vw.addEventListener('click',e=>{if(e.target===vw||e.target.classList.contains('vs'))close()});
+addEventListener('keydown',e=>{if(vw.hidden)return;if(e.key=='Escape')close();if(e.key=='ArrowLeft')go(-1);if(e.key=='ArrowRight')go(1)});
+let x0=null;vw.addEventListener('touchstart',e=>{x0=e.touches[0].clientX},{passive:true});vw.addEventListener('touchend',e=>{if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;if(Math.abs(dx)>50)go(dx<0?1:-1);x0=null});
+})()</script>
+VW;
+}
 function me(){global $db;if(empty($_SESSION['uid']))return null;$s=$db->prepare('SELECT * FROM users WHERE id=?');$s->execute([$_SESSION['uid']]);return $s->fetch(PDO::FETCH_ASSOC);}
 function tok(){return $_SESSION['t']??=bin2hex(random_bytes(16));}
-function chk(){if(!hash_equals(tok(),$_POST['t']??''))die('Session expired. Go back and try again.');}
-function head($t='Rally XRC',$d=''){$u=me();$d=$d?:"Rally XRC is the official RC rally game of Uganda. Register your car, join the youth and adult leagues, and meet the drivers, teams and fans. News, events, photos and videos.";$pr=$_SERVER['HTTP_X_FORWARDED_PROTO']??(!empty($_SERVER['HTTPS'])?'https':'http');$base=$pr.'://'.($_SERVER['HTTP_HOST']??'localhost');?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=h($t)?></title>
-<meta name="description" content="<?=h($d)?>"><meta name="theme-color" content="#ee5a2a"><meta name="google-site-verification" content="oUeRIWGccLhJhMMfUAiTSec_xvkPPdhw9kuRDzcETGI"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%81%3C/text%3E%3C/svg%3E">
+function chk(){if(!hash_equals(tok(),$_POST['t']??''))die('Your session expired. Go back, log in again and send the form again. What you typed is kept in this browser and will be filled in again.');}
+function head($t='Rally XRC',$d=''){$u=me();$d=$d?:"Rally XRC is the official RC rally game of Uganda. Register your car, join the junior and senior leagues, and meet the drivers, teams and fans. News, events, photos and videos.";$pr=$_SERVER['HTTP_X_FORWARDED_PROTO']??(!empty($_SERVER['HTTPS'])?'https':'http');$base=$pr.'://'.($_SERVER['HTTP_HOST']??'localhost');?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=h($t)?></title>
+<meta name="description" content="<?=h($d)?>"><meta name="theme-color" content="#ee5a2a"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-192.png"><meta name="google-site-verification" content="oUeRIWGccLhJhMMfUAiTSec_xvkPPdhw9kuRDzcETGI"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%81%3C/text%3E%3C/svg%3E">
 <meta property="og:type" content="website"><meta property="og:site_name" content="Rally XRC"><meta property="og:title" content="<?=h($t)?>"><meta property="og:description" content="<?=h($d)?>"><meta property="og:url" content="<?=h($base.$_SERVER['REQUEST_URI'])?>"><meta property="og:image" content="<?=h($base)?>/uploads/seed/s12.jpeg">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="<?=h($t)?>"><meta name="twitter:description" content="<?=h($d)?>"><meta name="twitter:image" content="<?=h($base)?>/uploads/seed/s12.jpeg">
 <?php if(basename($_SERVER['SCRIPT_NAME'])!='index.php')echo '<meta name="robots" content="noindex">';?>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Rally XRC","alternateName":["Rally XRC Uganda","RallyXRC","Rally XRCRC"],"url":<?=json_encode($base.'/')?>}</script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css"></head><body>
 <?php $b=$GLOBALS['db']->query("SELECT v FROM settings WHERE k='banner'")->fetchColumn();if($b)echo '<div class="banner">'.h($b).'</div>';?><nav><a class="logo" href="index.php">RALLY <b>XRC</b></a><form class="sf" action="search.php" method="get" role="search"><input name="q" placeholder="Search" aria-label="Search the site" maxlength="60"><button>Go</button></form><div><a href="index.php#news">News</a><a href="index.php#leagues">Leagues</a><a href="index.php#drivers">Drivers</a><a href="index.php#gallery">Gallery</a><a href="index.php#events">Events</a><a href="index.php#videos">Videos</a><a href="admin.php">Admin</a>
-<?php if($u){echo ($u['role']=='admin'?'<a href="payments.php">Payments'.(($n=(int)$GLOBALS['db']->query("SELECT COUNT(*) FROM deposits WHERE seen=0")->fetchColumn())?' <b class="bd">'.$n.'</b>':'').'</a>':'<a href="pay.php">Pay fees</a>').'<a href="auth.php?m=out">Log out ('.h(explode(' ',$u['name'])[0]).')</a>';}else echo '<a href="auth.php?m=login">Log in</a><a class="btn" href="auth.php?m=register">Join</a>';?></div></nav><?php }
-function foot(){echo '<footer><p>Rally XRC, the official RC rally game of Uganda. Drivers, teams and fans, one grid.</p><p class="sm"><a href="index.php">Home</a><a href="index.php#news">News</a><a href="index.php#events">Events</a><a href="index.php#leagues">Leagues</a><a href="index.php#drivers">The grid</a><a href="index.php#gallery">Gallery</a><a href="index.php#videos">Videos</a><a href="auth.php?m=register">Join</a><a href="auth.php?m=login">Log in</a><a href="sitemap.xml">Sitemap</a></p></footer></body></html>';}
+<?php if($u){echo ($u['role']=='admin'?'<a href="payments.php">Payments'.(($n=(int)$GLOBALS['db']->query("SELECT COUNT(*) FROM deposits WHERE seen=0")->fetchColumn())?' <b class="bd">'.$n.'</b>':'').'</a>':'<a href="profile.php">My profile</a><a href="pay.php">Pay fees</a>').'<a href="auth.php?m=out">Log out ('.h(explode(' ',$u['name'])[0]).')</a>';}else echo '<a href="auth.php?m=login">Log in</a><a class="btn" href="auth.php?m=register">Join</a>';?></div></nav><?php }
+function paystrip(){$s=basename($_SERVER['SCRIPT_NAME']);$u=me();$on=getenv('FLW_SECRET_KEY');
+ if(!in_array($s,['index.php','search.php'])||!($on||($u&&$u['role']=='admin')))return '';
+ $fee=(int)setting('monthly_fee',0);
+ return '<section class="paystrip" id="pay"><h2>Pay your monthly fee</h2><p>'.($fee?'Monthly fee: <b>'.ugx($fee).'</b>. ':'').'Pay safely on this website. You approve the payment on your phone.</p><a class="btn" href="pay.php?via=mobile">Pay with MTN or Airtel</a> <a class="btn alt" href="pay.php?via=card">Pay by card</a>'.($on?'':'<p><small>Only you can see this section until online payments are switched on.</small></p>').'</section>';}
+function foot(){echo paystrip().'<footer><p>Rally XRC, the official RC rally game of Uganda. Drivers, teams and fans, one grid.</p><p class="sm"><a href="index.php">Home</a><a href="index.php#news">News</a><a href="index.php#events">Events</a><a href="index.php#leagues">Leagues</a><a href="index.php#drivers">The grid</a><a href="index.php#gallery">Gallery</a><a href="index.php#videos">Videos</a><a href="auth.php?m=register">Join</a><a href="auth.php?m=login">Log in</a><a href="sitemap.xml">Sitemap</a></p></footer>'.viewer().'</body></html>';}
