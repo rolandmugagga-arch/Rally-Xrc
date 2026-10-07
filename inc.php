@@ -21,6 +21,7 @@ foreach([['users','photo'],['media','sort']] as [$t,$c])if(!in_array($c,array_co
 $db->exec("UPDATE media SET sort=id WHERE sort IS NULL");
 $db->exec("UPDATE users SET age_group='Junior' WHERE age_group='".'Y'."outh'");$db->exec("UPDATE users SET age_group='Senior' WHERE age_group='".'A'."dult'");
 $db->exec("CREATE TABLE IF NOT EXISTS push_subs(id INTEGER PRIMARY KEY,user_id INTEGER,endpoint TEXT UNIQUE,p256dh,auth,created DEFAULT CURRENT_TIMESTAMP)");
+$db->exec("UPDATE users SET phone='+256'||substr(phone,2) WHERE phone LIKE '0%' AND length(phone)=10");
 $cap=['Wheel up on the pit stand','Controllers out, cars on the slope','Josh Rally Team meets RallyXRC','Ford Fiesta in full livery','KCB Bank Subaru','The grid before the start','Two Subarus, rear view','Mechanic plugging in the battery','Citroen C3 WRC beside a Land Cruiser','Racing on the dirt stage','Sliding through the corner','Dust on the open stage','Fans gather at the chalk line','Stage run','Driver and car','Side-on action','Volkswagen Polo WRC','Black GR car throwing dirt','Rear view of a slide'];
 if(!$db->query("SELECT 1 FROM users WHERE role='admin'")->fetch()){
  $db->prepare("INSERT INTO users(name,email,pass,role,kind) VALUES('Admin',?,?,'admin','Admin')")->execute([getenv('ADMIN_EMAIL')?:'rolandmugagga@gmail.com',password_hash(getenv('ADMIN_PASSWORD')?:'Roland12',PASSWORD_DEFAULT)]);
@@ -29,7 +30,28 @@ if(!$db->query("SELECT 1 FROM users WHERE role='admin'")->fetch()){
 }
 function h($s){return htmlspecialchars((string)$s,ENT_QUOTES,'UTF-8');}
 function setting($k,$d=''){global $db;$s=$db->prepare('SELECT v FROM settings WHERE k=?');$s->execute([$k]);$v=$s->fetchColumn();return($v!==false&&$v!=='')?$v:$d;}
-function normphone($p){$p=preg_replace('/[\s\-().]/','',(string)$p);if(preg_match('/^\+?256(\d{9})$/',$p,$m))$p='0'.$m[1];return preg_match('/^0\d{9}$/',$p)?$p:false;}
+function countries(){static $c=null;if($c===null)$c=require __DIR__.'/countries.php';return $c;}
+function dial_ok($cc){foreach(countries() as $r)if($r[2]===$cc)return true;return false;}
+function normphone($p,$cc='256'){$p=preg_replace('/[\s\-().]/','',(string)$p);$cc=preg_replace('/\D/','',(string)$cc);if(!dial_ok($cc))return false;
+ if(preg_match('/^(?:\+|00)(\d{8,15})$/',$p,$m))$d=$m[1];else{$n=ltrim($p,'0');if(!preg_match('/^\d{6,14}$/',$n))return false;$d=$cc.$n;}
+ if(strpos($d,'256')===0&&!preg_match('/^256\d{9}$/',$d))return false;
+ return preg_match('/^\d{8,15}$/',$d)?'+'.$d:false;}
+function split_phone($p){$p=(string)$p;if(preg_match('/^0\d{9}$/',$p))return ['256',substr($p,1)];$d=ltrim($p,'+');foreach([3,2,1] as $n){$c=substr($d,0,$n);if(strlen($d)>$n&&dial_ok($c))return [$c,substr($d,$n)];}return ['256',ltrim($p,'+0')];}
+function phone_field($cc='256',$nat=''){$cc=preg_replace('/\D/','',(string)$cc);$cur='';foreach(countries() as $r)if($r[2]===$cc){$cur=$r[0].' +'.$r[2];break;}
+ $data=json_encode(array_map(fn($r)=>['n'=>$r[0],'i'=>$r[1],'d'=>$r[2]],countries()),JSON_UNESCAPED_UNICODE|JSON_HEX_TAG);
+ $js=<<<'PJ'
+(function(){const D=__DATA__,w=document.currentScript.parentNode,i=w.querySelector('.cs'),l=w.querySelector('.cl'),h=w.querySelector('[name=cc]');h.dataset.t=i.value;
+const nm=s=>s.toLowerCase().replace(/[^a-z0-9 ]/g,'');
+function render(q){q=nm(q);const m=D.filter(c=>!q||nm(c.n).includes(q)||c.i.toLowerCase()==q||c.d.startsWith(q)).slice(0,60);
+l.innerHTML=m.map(c=>'<div role="option" data-d="'+c.d+'" data-t="'+c.n.replace(/"/g,'&quot;')+' +'+c.d+'">'+c.n+' <small>+'+c.d+'</small></div>').join('')||'<div>No match</div>';l.hidden=false}
+function pick(el){if(!el||!el.dataset.d)return;h.value=el.dataset.d;h.dataset.t=el.dataset.t;i.value=el.dataset.t;l.hidden=true}
+i.addEventListener('focus',()=>{i.select();render('')});i.addEventListener('input',()=>render(i.value));
+i.addEventListener('blur',()=>{l.hidden=true;i.value=h.dataset.t});
+i.addEventListener('keydown',e=>{if(e.key=='Enter'){e.preventDefault();pick(l.querySelector('div[data-d]'))}if(e.key=='Escape'){l.hidden=true;i.blur()}});
+l.addEventListener('mousedown',e=>{e.preventDefault();pick(e.target.closest('div'))});
+})()
+PJ;
+ return '<div class="fld"><b>Mobile number</b><span class="phf"><span class="cp"><input class="cs" type="text" value="'.h($cur).'" placeholder="Search country or code" autocomplete="off" aria-label="Country, search by name or calling code"><span class="cl" hidden></span></span><input type="hidden" name="cc" value="'.h($cc).'"><input name="phone" type="tel" inputmode="tel" value="'.h($nat).'" placeholder="Number without country code" required></span><script>'.str_replace('__DATA__',$data,$js).'</script></div>';}
 function ugx($n){return 'UGX '.number_format((int)$n);}
 function notify($t){$tk=getenv('TELEGRAM_BOT_TOKEN');$ch=getenv('TELEGRAM_CHAT_ID');if(!$tk||!$ch)return;@file_get_contents("https://api.telegram.org/bot$tk/sendMessage",false,stream_context_create(['http'=>['method'=>'POST','header'=>"Content-Type: application/x-www-form-urlencoded\r\n",'content'=>http_build_query(['chat_id'=>$ch,'text'=>$t]),'timeout'=>3]]));}
 function flw($method,$path,$body=null){$k=getenv('FLW_SECRET_KEY');if(!$k)return null;$c=curl_init('https://api.flutterwave.com/v3'.$path);curl_setopt_array($c,[CURLOPT_RETURNTRANSFER=>1,CURLOPT_TIMEOUT=>20,CURLOPT_CUSTOMREQUEST=>$method,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$k,'Content-Type: application/json']]);if($body!==null)curl_setopt($c,CURLOPT_POSTFIELDS,json_encode($body));$r=curl_exec($c);return $r?json_decode($r,true):null;}

@@ -1,9 +1,9 @@
 <?php require 'inc.php';require_once 'push.php';$u=me();if(!$u){header('Location: auth.php?m=login');exit;}if($u['role']=='admin'){header('Location: admin.php');exit;}
 $K=['Driver','Co-driver','Team owner','Mechanic','Marshal','Fan'];$msg='';$err='';
 if($_SERVER['REQUEST_METHOD']=='POST'){chk();$a=$_POST['a']??'';
- if($a=='profile'){$ph=normphone($_POST['phone']??'');$n=trim($_POST['name']??'');
-  if(!$n)$err='Please enter your name.';elseif(!$ph)$err='Enter a valid Uganda mobile number, like 0771234567.';
-  else{$db->prepare('UPDATE users SET name=?,kind=?,age_group=?,car=?,phone=?,network=? WHERE id=?')->execute([$n,in_array($_POST['kind']??'',$K)?$_POST['kind']:'Fan',($_POST['age']??'')=='Junior'?'Junior':'Senior',trim($_POST['car']??''),$ph,($_POST['network']??'')=='Airtel'?'Airtel':'MTN',$u['id']]);$msg='Profile saved.';}}
+ if($a=='profile'){$ph=normphone($_POST['phone']??'',$_POST['cc']??'256');$n=trim($_POST['name']??'');
+  if(!$n)$err='Please enter your name.';elseif(!$ph)$err='Enter a valid mobile number. Pick your country, then type the number without the country code.';
+  else{$db->prepare('UPDATE users SET name=?,kind=?,age_group=?,car=?,phone=?,network=? WHERE id=?')->execute([$n,in_array($_POST['kind']??'',$K)?$_POST['kind']:'Fan',($_POST['age']??'')=='Junior'?'Junior':'Senior',trim($_POST['car']??''),$ph,(in_array($_POST['network']??'',['Airtel','Other'])?$_POST['network']:'MTN'),$u['id']]);$msg='Profile saved.';}}
  if($a=='password'){if(!password_verify($_POST['old']??'',$u['pass']))$err='Your current password is not right.';elseif(strlen($_POST['new']??'')<8)$err='The new password needs 8 or more characters.';else{$db->prepare('UPDATE users SET pass=? WHERE id=?')->execute([password_hash($_POST['new'],PASSWORD_DEFAULT),$u['id']]);$msg='Password changed.';}}
  if($a=='photo'){$f=$_FILES['photo']??null;$im=($f&&$f['error']===0&&$f['size']<=8*1048576)?@getimagesize($f['tmp_name']):false;$ext=['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp'][$im['mime']??'']??'';
   if(!$ext)$err='Please choose a JPG, PNG or WebP picture under 8 MB.';
@@ -22,8 +22,8 @@ if($_SERVER['REQUEST_METHOD']=='POST'){chk();$a=$_POST['a']??'';
 <label>I am a<select name="kind"><?php foreach($K as $k)echo '<option'.($k==$u['kind']?' selected':'').'>'.$k.'</option>';?></select></label>
 <label>League<select name="age"><option<?=$u['age_group']=='Junior'?' selected':''?>>Junior</option><option<?=$u['age_group']=='Senior'?' selected':''?>>Senior</option></select></label>
 <label>Car or team<input name="car" value="<?=h($u['car'])?>"></label>
-<label>Mobile money network<select name="network"><option<?=$u['network']=='MTN'?' selected':''?>>MTN</option><option<?=$u['network']=='Airtel'?' selected':''?>>Airtel</option></select></label>
-<label>Mobile number<input name="phone" type="tel" value="<?=h($u['phone'])?>" required></label><button class="btn">Save my details</button></form>
+<label>Mobile money network (Uganda numbers)<select name="network"><option<?=$u['network']=='MTN'?' selected':''?>>MTN</option><option<?=$u['network']=='Airtel'?' selected':''?>>Airtel</option><option<?=$u['network']=='Other'?' selected':''?>>Other</option></select></label>
+<?php [$pcc,$pnat]=split_phone($u['phone']);echo phone_field($pcc,$pnat);?><button class="btn">Save my details</button></form>
 <h3>Change password</h3><form method="post"><input type="hidden" name="t" value="<?=tok()?>"><input type="hidden" name="a" value="password">
 <label>Current password<input type="password" name="old" required></label><label>New password (8 or more characters)<input type="password" name="new" minlength="8" required></label><button class="btn">Change password</button></form>
 <h3>Notifications</h3><p>Get news and event alerts on this phone.</p><?php if($pub):?><button class="btn" id="nb" type="button">Turn on notifications</button> <button class="x" id="nx" type="button">Turn off</button><?php else:?><p>Notifications are not available on this server yet.</p><?php endif;?><p id="ns"></p>
