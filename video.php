@@ -1,6 +1,6 @@
 <?php
-$f=$_GET['f']??'';if(!preg_match('/^[a-f0-9]{16}\.(mp4|mov|m4v|webm)$/',$f,$m)){http_response_code(404);exit;}
-$p=__DIR__.'/uploads/files/'.$f;if(!is_file($p)){http_response_code(404);exit;}
+$f=$_GET['f']??'';if(!preg_match('/^(?:[a-f0-9]{16}|cover)\.(mp4|mov|m4v|webm)$/',$f,$m)){http_response_code(404);exit;}
+$p=__DIR__.(strpos($f,'cover.')===0?'/uploads/':'/uploads/files/').$f;if(!is_file($p)){http_response_code(404);exit;}
 $types=['mp4'=>'video/mp4','m4v'=>'video/mp4','mov'=>'video/quicktime','webm'=>'video/webm'];
 $size=filesize($p);$start=0;$end=$size-1;
 header('Content-Type: '.$types[$m[1]]);header('Accept-Ranges: bytes');header('Cache-Control: public, max-age=86400');

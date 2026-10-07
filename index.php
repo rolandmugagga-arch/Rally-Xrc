@@ -3,6 +3,7 @@ $hero=basename((glob(__DIR__.'/uploads/seed/s12.*')?:[''])[0]);
 $poster=is_file(__DIR__.'/uploads/cover.jpg')?'uploads/cover.jpg':'uploads/seed/'.$hero;
 $hm=$db->query("SELECT m.kind,m.path FROM settings s JOIN media m ON m.id=CAST(s.v AS INTEGER) WHERE s.k='hero_media'")->fetch(PDO::FETCH_ASSOC);
 $hv=($hm&&$hm['kind']=='video')?$hm['path']:'';$bgimg=($hm&&$hm['kind']=='image')?$hm['path']:$poster;
+if(!$hm&&is_file(__DIR__.'/uploads/cover.mp4'))$hv='uploads/cover.mp4';
 $me=me();
 $posts=$db->query('SELECT * FROM posts ORDER BY id DESC LIMIT 6')->fetchAll();
 $mem=$db->query("SELECT id,name,kind,age_group,car,photo FROM users WHERE role!='admin' ORDER BY id DESC")->fetchAll();
@@ -16,5 +17,5 @@ $vid=$db->query("SELECT * FROM media WHERE kind='video' ORDER BY sort,id")->fetc
 <section id="drivers" class="wrap"><h2>The grid</h2><?php if(!$mem)echo '<p>No members yet. Be the first on the grid.</p>';?><div class="grid"><?php foreach($mem as $m):?><div class="mem"><?php if(!empty($m['photo'])&&$me&&($me['role']=='admin'||$me['id']==$m['id']))echo '<img class="av" src="'.h($m['photo']).'" alt="">';?><h3><?=h($m['name'])?></h3><p><?=h($m['kind'])?>, <?=h($m['age_group'])?><?=$m['car']?'. Car: '.h($m['car']):''?></p></div><?php endforeach;?></div></section>
 <section id="gallery" class="wrap"><h2>Gallery</h2><div class="masonry"><?php foreach($img as $i):?><figure><img loading="lazy" src="<?=h($i['path'])?>" alt="<?=h($i['caption'])?>"><figcaption><?=h($i['caption'])?></figcaption></figure><?php endforeach;?></div></section>
 <section id="videos" class="wrap"><h2>Videos</h2><?php if(!$vid)echo '<p>Race videos will appear here once the admin uploads them.</p>';?><div class="vgrid"><?php foreach($vid as $v):?><figure class="vid" data-src="<?=h(mv($v['path']))?>"><video muted playsinline preload="metadata" src="<?=h(mv($v['path']))?>#t=0.1"></video><figcaption><?=h($v['caption'])?></figcaption></figure><?php endforeach;?></div></section>
-<script>const hv=document.querySelector('.hv');if(hv&&(matchMedia('(prefers-reduced-motion:reduce)').matches||(navigator.connection&&navigator.connection.saveData))){const hd=hv.parentNode;hd.style.background='url('+hv.poster+') center/cover';hv.remove()}</script>
+<script>const hv=document.querySelector('.hv');if(hv){const pv=()=>{if(hv.videoWidth&&hv.videoHeight>hv.videoWidth)hv.parentNode.classList.add('pv')};hv.addEventListener('loadedmetadata',pv);if(hv.readyState>=1)pv()}if(hv&&(matchMedia('(prefers-reduced-motion:reduce)').matches||(navigator.connection&&navigator.connection.saveData))){const hd=hv.parentNode;hd.style.background='url('+hv.poster+') center/cover';hv.remove()}</script>
 <?php foot();

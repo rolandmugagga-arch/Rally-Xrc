@@ -62,7 +62,7 @@ function flw_confirm($id){global $db;$r=flw('GET','/transactions/'.rawurlencode(
  if($p['status']!='confirmed'){$db->prepare("UPDATE deposits SET status='confirmed',seen=0,note=? WHERE id=?")->execute(['Flutterwave #'.$d['id'],$p['id']]);notify('Payment received: '.ugx($p['amount']).' from '.$p['uname'].' for '.$p['month'].'.');}
  return true;}
 function fcsv($o,$r){fputcsv($o,$r,',','"','');}
-function mv($p){return preg_match('#^uploads/files/([a-f0-9]{16}\.(?:mp4|mov|m4v|webm))$#',$p,$m)?'video.php?f='.$m[1]:$p;}
+function mv($p){if($p==='uploads/cover.mp4')return 'video.php?f=cover.mp4';return preg_match('#^uploads/files/([a-f0-9]{16}\.(?:mp4|mov|m4v|webm))$#',$p,$m)?'video.php?f='.$m[1]:$p;}
 function viewer(){return <<<'VW'
 <div id="vw" hidden role="dialog" aria-label="Photo and video viewer"><button type="button" class="vx" aria-label="Close">&times;</button><button type="button" class="vp" aria-label="Previous">&#8249;</button><button type="button" class="vn" aria-label="Next">&#8250;</button><div class="vs"></div><p class="vc"></p></div>
 <script>(function(){const vw=document.getElementById('vw');if(!vw)return;let L=[],i=0;
