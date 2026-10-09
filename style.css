@@ -78,3 +78,4 @@ button.th{background:transparent;color:var(--ink)!important;border:2px solid var
 .adz{border:2px dashed var(--coral);border-radius:12px;padding:.8rem;text-align:center;cursor:pointer;margin:.4rem 0}.adz.on,.adz:hover{background:var(--peach)}
 .pics{float:right;display:flex;gap:.4rem;align-items:flex-end;margin:0 0 .4rem .6rem}.pics .av{float:none;margin:0}.cv{width:96px;height:64px;object-fit:cover;border-radius:8px}
 .carp{width:240px;max-width:100%;height:auto;border-radius:12px;display:block;margin:.6rem 0 0}
+[data-theme=dark] .hero .bg::after{background:linear-gradient(90deg,rgba(42,80,66,.94),rgba(42,80,66,.78) 40%,rgba(42,80,66,0) 85%)}[data-theme=dark] .hero.pv{background:linear-gradient(135deg,#3b6b58,#2a5042)}
