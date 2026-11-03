@@ -1,0 +1,4 @@
+---
+deployment:
+  tasks:
+    - 'test -n "$HOME" && test -d "$HOME" && DEPLOYPATH="$HOME/public_html" && mkdir -p "$DEPLOYPATH" && rsync -a --exclude="/.git/" --exclude="/.cpanel.yml" --exclude="/config.php" --exclude="/data/" --exclude="/uploads/files/" ./ "$DEPLOYPATH"/'

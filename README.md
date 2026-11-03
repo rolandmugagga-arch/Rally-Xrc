@@ -2,7 +2,7 @@
 
 The official RC rally game website for Uganda. It links drivers, co-drivers, teams, mechanics, marshals and fans, in both youth and adult leagues.
 
-**Live design preview:** enable GitHub Pages (see below). The preview keeps data in the visitor's browser only.
+**GitHub Pages preview:** serves the static `index.html` only; it does not run PHP or show the live database, admin, or account features. Use PHP hosting for the full site.
 
 ## Features
 - Home page with hero, news, events, leagues, member grid, photo gallery with full-screen view, and videos
@@ -21,18 +21,18 @@ The database is created on the first visit.
 
 ## Run it with Docker
 ```
-cp .env.example .env     # then edit the admin email and password
 docker compose up --build
 ```
+Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in the environment before first startup.
 Open `http://localhost:8080`.
 
 ## Admin login
 Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` as environment variables **before the first run**. If you do not, the defaults in `inc.php` are used, so change the password in the admin panel (Admin account, at the bottom) straight away. Open the site and click **Admin**.
 
 ## Put it online
-- **PHP hosting:** upload the folder by FTP or Git. Make `data/` and `uploads/` writable.
+- **cPanel/PHP hosting:** deploy with Git Version Control using `.cpanel.yml`, or upload the files manually. Follow [HOSTING.txt](HOSTING.txt) before opening the site for the first time.
 - **Railway or Render:** deploy this repo using the Dockerfile and attach ONE persistent volume mounted at `/persist`. The database and uploaded photos and videos are stored there, outside the public web folder, so they survive redeploys.
-- **GitHub Pages (preview only):** Settings, Pages, Source: GitHub Actions. The workflow publishes the `docs/` folder.
+- **GitHub Pages:** static `index.html` preview only. Dynamic PHP features require PHP hosting.
 
 ## Folder guide
 | Path | Purpose |
@@ -44,10 +44,10 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` as environment variables **before the fir
 | `style.css` | Design |
 | `uploads/` | Photos and videos (`seed/` holds the starting photos) |
 | `data/` | SQLite database when running locally (blocked from web access, not committed). In Docker the database lives in `/persist` |
-| `docs/` | Static preview for GitHub Pages |
+| `index.html` | Static GitHub Pages preview; the live PHP site uses `index.php` |
 
 ## Limits
-Large video uploads depend on your host's `upload_max_filesize` and `post_max_size` (set to 512M in `.htaccess`, `.user.ini` and Docker). Under-18 sign-ups may need parental consent wording for your event.
+Large video uploads depend on your host's `upload_max_filesize`, `post_max_size`, and execution-time limits. On cPanel, configure these in MultiPHP INI Editor; Docker configures 512 MB upload limits. Under-18 sign-ups may need parental consent wording for your event.
 
 ## Licence
 MIT, see `LICENSE`.

@@ -1,14 +1,20 @@
-HOW TO RUN RALLY XRC ON ORDINARY PHP HOSTING (cPanel or similar)
+RALLY XRC ON CPANEL PHP HOSTING
 
-What the host must have: PHP 7.4 or newer with SQLite (pdo_sqlite), mbstring, curl and openssl. Free HTTPS (SSL) is needed for notifications.
+Requirements
+- PHP 7.4 or newer with pdo_sqlite, mbstring, curl and openssl.
+- Apache with .htaccess support, writable site files, and rsync for Git deployment.
+- HTTPS and enough storage for the site's database and uploaded media.
 
-1. Buy or open a PHP hosting account. Ask the host: "Does it support PHP with SQLite and uploads of 100 MB or more?"
-2. In the host's File Manager, open the public folder (public_html or the folder for your domain).
-3. Upload rallyx.zip there and choose Extract. Move everything out of the "rallyx" folder so index.php sits directly in the public folder.
-4. Open  yourdomain/check.php  in a browser. Every line should say YES. Then DELETE check.php.
-5. Copy config.example.php to config.php. Remove the // in front of ADMIN_EMAIL and ADMIN_PASSWORD and set your own values. Do this BEFORE you open the site for the first time. If your host lets you keep files outside the public folder, also set DB_PATH to a folder above public_html.
-6. Open the site. The first visit creates the database and the admin account. Log in at Admin, then change the password.
-7. Turn on SSL (Let's Encrypt or AutoSSL) in the host's control panel.
-8. For large videos, raise upload_max_filesize and post_max_size in the host's PHP settings ("Select PHP version" or "MultiPHP INI Editor") to 200M or more.
+Deploy with cPanel Git Version Control
+1. In cPanel, open Git Version Control and clone this GitHub repository into a directory OUTSIDE the website document root, such as a new rallyx-deploy directory in your home folder. Do not clone directly into public_html.
+2. Set the repository's active branch to main. If the site uses an add-on domain with a document root other than public_html, edit the `DEPLOYPATH="$HOME/public_html"` value in .cpanel.yml to that exact document root.
+3. Use cPanel File Manager to copy config.example.php to config.php directly in the site's document root. Edit config.php to uncomment and set a unique administrator email and strong password. Never commit config.php or send its contents to anyone. Do this before the first site visit; the first visit creates the administrator account, and changing these values later does not change an account already created.
+4. If the host permits private storage outside the document root, create a writable data directory there and set DB_PATH in config.php to an absolute path ending in rallyx.sqlite. The deployment task preserves config.php, data/, and uploads/files/ on later deployments.
+5. In cPanel Git Version Control, choose Deploy HEAD Commit. The included .cpanel.yml syncs the app to the primary domain's public_html by default without deleting other files. Use a dedicated document root for Rally XRC; deploying files with the same names as another site will replace those files. Create config.php before visiting the site.
+6. Open check.php on the site and confirm all required checks pass, then delete check.php from the web root.
+7. Enable AutoSSL or Let's Encrypt in cPanel. In PHP's MultiPHP INI Editor, raise upload_max_filesize and post_max_size if large videos are needed.
+8. Point the domain's DNS to the cPanel host using the host's documented DNS records. The Git deployment does not change DNS.
 
-Backups: in Admin, use "Download database backup" often, and keep your original photos and videos.
+If Git deployment is unavailable, the files can be uploaded to the domain's document root with cPanel File Manager. Keep config.php, data/, and uploads/files/ intact during updates.
+
+Backups: in Admin, download the database backup regularly, and keep separate copies of uploaded photos and videos.
