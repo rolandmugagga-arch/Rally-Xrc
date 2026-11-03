@@ -1,4 +1,5 @@
 <?php
+if(is_file(__DIR__.'/config.php'))require_once __DIR__.'/config.php';
 ini_set('display_errors','0');error_reporting(E_ALL);
 $sp=getenv('DB_PATH')?dirname(getenv('DB_PATH')).'/sessions':'';if($sp){@mkdir($sp,0775,true);if(is_dir($sp)&&is_writable($sp))session_save_path($sp);}
 ini_set('session.gc_maxlifetime','2592000');
@@ -22,6 +23,7 @@ $db->exec("UPDATE media SET sort=id WHERE sort IS NULL");$db->exec("UPDATE users
 $db->exec("UPDATE users SET age_group='Junior' WHERE age_group='".'Y'."outh'");$db->exec("UPDATE users SET age_group='Senior' WHERE age_group='".'A'."dult'");
 $db->exec("CREATE TABLE IF NOT EXISTS push_subs(id INTEGER PRIMARY KEY,user_id INTEGER,endpoint TEXT UNIQUE,p256dh,auth,created DEFAULT CURRENT_TIMESTAMP)");
 $db->exec("UPDATE users SET phone='+256'||substr(phone,2) WHERE phone LIKE '0%' AND length(phone)=10");
+$db->exec("CREATE TABLE IF NOT EXISTS passkeys(id INTEGER PRIMARY KEY,user_id INTEGER,cred_id TEXT UNIQUE,pubkey TEXT,sign_count INTEGER DEFAULT 0,name TEXT,created DEFAULT CURRENT_TIMESTAMP)");
 $db->exec("CREATE TABLE IF NOT EXISTS sponsors(id INTEGER PRIMARY KEY,name,logo,url,sort INTEGER)");
 if(!setting('sponsors_seeded')&&is_file(__DIR__.'/uploads/amra-u.jpg')){$db->exec("INSERT INTO sponsors(name,logo,url,sort) VALUES('AMRA.U','uploads/amra-u.jpg','',1)");$db->exec("REPLACE INTO settings(k,v) VALUES('sponsors_seeded','1')");}
 $db->exec("CREATE TABLE IF NOT EXISTS articles(id INTEGER PRIMARY KEY,title,body,image,sort INTEGER,created DEFAULT CURRENT_TIMESTAMP)");

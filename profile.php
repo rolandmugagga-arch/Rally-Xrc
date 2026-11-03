@@ -1,4 +1,4 @@
-<?php require 'inc.php';require_once 'push.php';$u=me();if(!$u){header('Location: auth.php?m=login');exit;}if($u['role']=='admin'){header('Location: admin.php');exit;}
+<?php require 'inc.php';require_once 'push.php';require_once 'webauthn.php';$u=me();if(!$u){header('Location: auth.php?m=login');exit;}if($u['role']=='admin'){header('Location: admin.php');exit;}
 $K=['Driver','Co-driver','Team owner','Mechanic','Marshal','Fan'];$msg='';$err='';
 if($_SERVER['REQUEST_METHOD']=='POST'){chk();$a=$_POST['a']??'';
  if($a=='profile'){$ph=normphone($_POST['phone']??'',$_POST['cc']??'256');$n=trim($_POST['name']??'');
@@ -31,6 +31,7 @@ if($_SERVER['REQUEST_METHOD']=='POST'){chk();$a=$_POST['a']??'';
 <?php [$pcc,$pnat]=split_phone($u['phone']);echo phone_field($pcc,$pnat);?><button class="btn">Save my details</button></form>
 <h3>Change password</h3><form method="post"><input type="hidden" name="t" value="<?=tok()?>"><input type="hidden" name="a" value="password">
 <label>Current password<input type="password" name="old" required></label><label>New password (8 or more characters)<input type="password" name="new" minlength="8" required></label><button class="btn">Change password</button></form>
+<?=passkey_panel()?>
 <h3>Notifications</h3><p>Get news and event alerts on this phone.</p><?php if($pub):?><button class="btn" id="nb" type="button">Turn on notifications</button> <button class="x" id="nx" type="button">Turn off</button><?php else:?><p>Notifications are not available on this server yet.</p><?php endif;?><p id="ns"></p>
 <script>
 const PUB='<?=h($pub)?>',TK='<?=tok()?>',ns=document.getElementById('ns'),ps=document.getElementById('ps'),pf=document.getElementById('pf');

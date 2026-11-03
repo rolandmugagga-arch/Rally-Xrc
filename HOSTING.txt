@@ -1,0 +1,14 @@
+HOW TO RUN RALLY XRC ON ORDINARY PHP HOSTING (cPanel or similar)
+
+What the host must have: PHP 7.4 or newer with SQLite (pdo_sqlite), mbstring, curl and openssl. Free HTTPS (SSL) is needed for notifications.
+
+1. Buy or open a PHP hosting account. Ask the host: "Does it support PHP with SQLite and uploads of 100 MB or more?"
+2. In the host's File Manager, open the public folder (public_html or the folder for your domain).
+3. Upload rallyx.zip there and choose Extract. Move everything out of the "rallyx" folder so index.php sits directly in the public folder.
+4. Open  yourdomain/check.php  in a browser. Every line should say YES. Then DELETE check.php.
+5. Copy config.example.php to config.php. Remove the // in front of ADMIN_EMAIL and ADMIN_PASSWORD and set your own values. Do this BEFORE you open the site for the first time. If your host lets you keep files outside the public folder, also set DB_PATH to a folder above public_html.
+6. Open the site. The first visit creates the database and the admin account. Log in at Admin, then change the password.
+7. Turn on SSL (Let's Encrypt or AutoSSL) in the host's control panel.
+8. For large videos, raise upload_max_filesize and post_max_size in the host's PHP settings ("Select PHP version" or "MultiPHP INI Editor") to 200M or more.
+
+Backups: in Admin, use "Download database backup" often, and keep your original photos and videos.
